@@ -14,6 +14,7 @@ add_library(
     src/HealthMonitor.cpp
     src/FaultInjector.cpp
     src/Watchdog.cpp
+    src/TelemetryLogger.cpp
 )
 
 target_include_directories(
@@ -71,4 +72,20 @@ target_link_libraries(
 add_test(
     NAME WatchdogTests
     COMMAND test_watchdog
+)
+
+add_executable(
+    test_telemetry_logger
+    tests/test_telemetry_logger.cpp
+)
+
+target_link_libraries(
+    test_telemetry_logger
+    PRIVATE
+    rtos_core
+)
+
+add_test(
+    NAME TelemetryLoggerTests
+    COMMAND test_telemetry_logger
 )
