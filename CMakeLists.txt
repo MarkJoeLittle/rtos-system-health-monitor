@@ -89,3 +89,20 @@ add_test(
     NAME TelemetryLoggerTests
     COMMAND test_telemetry_logger
 )
+
+find_package(Python3 COMPONENTS Interpreter)
+
+if(Python3_Interpreter_FOUND)
+    add_test(
+        NAME TelemetryCliTests
+        COMMAND
+            "${Python3_EXECUTABLE}"
+            "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_telemetry_cli.py"
+            "$<TARGET_FILE:rtos_health_monitor>"
+    )
+
+    set_tests_properties(
+        TelemetryCliTests
+        PROPERTIES TIMEOUT 45
+    )
+endif()
