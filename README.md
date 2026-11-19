@@ -27,6 +27,7 @@ The project also includes deterministic fault injection so abnormal conditions c
 - RTOS-style cooperative periodic scheduler
 - Configurable task periods
 - Shared telemetry state
+- Versioned CSV telemetry snapshots
 - Temperature, voltage, and communications monitoring
 - Deterministic fault injection
 - Watchdog supervision
@@ -146,6 +147,9 @@ Current test executables:
 
 - `test_health_monitor`
 - `test_watchdog`
+- `test_telemetry_logger`
+- `test_task_scheduler`
+- `test_telemetry_cli.py` (registered when Python 3 is available)
 
 Health-monitor verification covers:
 
@@ -164,13 +168,14 @@ Watchdog verification covers:
 - `HLR-WD-003` Faulted task is identified
 - `HLR-WD-004` No additional deadline miss -> recovery to HEALTHY
 
-Local verification result:
+CTest reports the tests available in the current build. The Python CLI test is
+registered when CMake finds a Python 3 interpreter.
 
-```text
-100% tests passed, 0 tests failed out of 2
-```
-
-GitHub Actions also configures, builds, and runs the CTest suite automatically on pushes and pull requests to `main`.
+GitHub Actions configures, builds, and runs CTest on pushes and pull requests
+to `main`. A separate interoperability job analyzes a generated CSV using a
+pinned revision of the
+[telemetry-log-analyzer](https://github.com/MarkJoeLittle/telemetry-log-analyzer)
+project.
 
 ## Requirements Traceability
 
@@ -190,6 +195,10 @@ HLR-HM-003
 
 This demonstrates a simplified requirements-driven development process used in high-assurance and safety-critical software environments.
 
+The CSV columns, types, timestamp semantics, snapshot behavior, and schema
+compatibility rules are defined in
+[docs/telemetry_contract.md](docs/telemetry_contract.md).
+
 ## Repository Structure
 
 ```text
@@ -200,21 +209,27 @@ rtos-system-health-monitor/
 |-- README.md
 |-- docs/
 |   |-- requirements.md
+|   |-- telemetry_contract.md
 |   `-- traceability_matrix.md
 |-- include/
 |   |-- FaultInjector.hpp
 |   |-- HealthMonitor.hpp
 |   |-- SystemState.hpp
 |   |-- TaskScheduler.hpp
+|   |-- TelemetryLogger.hpp
 |   `-- Watchdog.hpp
 |-- src/
 |   |-- FaultInjector.cpp
 |   |-- HealthMonitor.cpp
 |   |-- main.cpp
 |   |-- TaskScheduler.cpp
+|   |-- TelemetryLogger.cpp
 |   `-- Watchdog.cpp
 `-- tests/
     |-- test_health_monitor.cpp
+    |-- test_task_scheduler.cpp
+    |-- test_telemetry_cli.py
+    |-- test_telemetry_logger.cpp
     `-- test_watchdog.cpp
 ```
 
@@ -236,42 +251,62 @@ Build:
 cmake --build build-wsl
 ```
 
-Run:
+Run (the default duration is 20 seconds):
 
 ```bash
-./build-wsl/rtos_health_monitor
+./build-wsl/rtos_health_monitor [--duration SECONDS]
 ```
 
-To also save periodic telemetry snapshots as CSV:
+Run a short capture or adjust the telemetry sampling interval:
 
 ```bash
-./build-wsl/rtos_health_monitor --telemetry telemetry.csv
+./build-wsl/rtos_health_monitor --duration 5
+./build-wsl/rtos_health_monitor --telemetry telemetry.csv --duration 20 --telemetry-interval-ms 1000
 ```
 
-Choose a new filename; existing files are not overwritten.
+The telemetry interval defaults to 1000 milliseconds and is only accepted when
+`--telemetry` is enabled. Duration and interval values must be positive whole
+numbers. Existing output files are not overwritten; choose a new filename.
 
 ### Analyze Telemetry with Python
 
-With `telemetry-log-analyzer` checked out beside this repository:
+The C++ project can be built and used without the Python analyzer. To run the
+demo runner from a separate analyzer checkout, pass the monitor checkout path:
 
 ```bash
-mkdir -p logs
-./build-wsl/rtos_health_monitor --telemetry logs/session.csv
-python3 ../telemetry-log-analyzer/analyzer.py logs/session.csv --expected-interval 1.05
+python3 /path/to/telemetry-log-analyzer/scripts/run_health_monitor_demo.py \
+  --monitor-root /path/to/rtos-system-health-monitor
 ```
+
+For a nonstandard executable location, use the runner's `--monitor` option as
+well. It creates a timestamped CSV and JSON report under the monitor project's
+`logs/` directory. Alternatively, invoke `analyzer.py` directly on a CSV path
+when you only need analysis.
 
 Snapshots contain the latest available sensor values. Timestamps preserve
 actual elapsed time using a steady clock anchored to UTC at startup.
 
 The 1.05-second analysis threshold allows 50 milliseconds of scheduling
 variation around the nominal one-second logging period. It is a
-demonstration setting, not a real-time timing guarantee.
+demonstration setting, not a real-time timing guarantee. When changing the
+logging interval, set the analyzer's expected interval and tolerance to match.
 
 One observed 20-second run produced 19 readings, including 9 readings
 with sensor faults and one timing gap of approximately 1.70 seconds.
 Results can vary with host scheduling.
 
+Each successful run also creates a `*-manifest.json` file containing the
+contract version, expected interval, executable path, generated filenames,
+and host platform.
+
+The JSON report includes mean, minimum, and maximum observed inter-reading
+intervals. These host measurements do not prove real-time compliance.
+
 Generated files under `logs/` are excluded from Git.
+
+The complete producer/consumer format, including contract version 1, is
+documented in [Telemetry CSV Contract](docs/telemetry_contract.md). The
+analyzer requires the exact four-column CSV header.
 
 Run all tests:
 
@@ -284,6 +319,8 @@ Run individual verification executables:
 ```bash
 ./build-wsl/test_health_monitor
 ./build-wsl/test_watchdog
+./build-wsl/test_telemetry_logger
+./build-wsl/test_task_scheduler
 ```
 
 ## Engineering Concepts Demonstrated
@@ -301,6 +338,8 @@ Run individual verification executables:
 - Requirements-driven development
 - Automated verification
 - Requirements traceability
+- Versioned telemetry contracts
+- Cross-project telemetry interoperability
 - CMake and CTest
 - Continuous Integration (CI)
 - Linux/WSL development
@@ -314,7 +353,6 @@ This project does not claim DO-178C certification or compliance. It demonstrates
 
 Potential extensions include:
 
-- Scheduler-focused unit tests
 - Task priorities
 - Preemptive scheduling simulation
 - Hardware-in-the-loop (HIL) simulation

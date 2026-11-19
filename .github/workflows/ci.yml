@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -22,3 +25,54 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+  telemetry-interoperability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out health monitor
+        uses: actions/checkout@v4
+        with:
+          path: rtos-system-health-monitor
+          persist-credentials: false
+
+      - name: Check out telemetry analyzer
+        uses: actions/checkout@v4
+        with:
+          repository: MarkJoeLittle/telemetry-log-analyzer
+          ref: 7ea8f3844c2761490b2337ab43cfbd958a96626e
+          path: telemetry-log-analyzer
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Configure and build health monitor
+        working-directory: rtos-system-health-monitor
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --target rtos_health_monitor --parallel
+
+      - name: Generate and analyze telemetry
+        working-directory: rtos-system-health-monitor
+        run: |
+          mkdir -p logs
+          ./build/rtos_health_monitor --telemetry logs/session.csv --duration 3
+          python ../telemetry-log-analyzer/analyzer.py logs/session.csv --expected-interval 1.05
+
+      - name: Record integration revisions
+        run: |
+          {
+            echo "## Telemetry interoperability"
+            echo "- Health monitor: \`$(git -C rtos-system-health-monitor rev-parse HEAD)\`"
+            echo "- Analyzer: \`$(git -C telemetry-log-analyzer rev-parse HEAD)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload telemetry sample
+        uses: actions/upload-artifact@v4
+        with:
+          name: telemetry-interoperability-csv
+          path: rtos-system-health-monitor/logs/session.csv

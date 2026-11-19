@@ -1,6 +1,7 @@
 #include "TaskScheduler.hpp"
 
 #include <algorithm>
+#include <stdexcept>
 #include <thread>
 #include <utility>
 
@@ -9,6 +10,16 @@ void TaskScheduler::addTask(
     std::chrono::milliseconds period,
     TaskCallback callback)
 {
+    if (period <= std::chrono::milliseconds::zero())
+    {
+        throw std::invalid_argument("Task period must be positive.");
+    }
+
+    if (!callback)
+    {
+        throw std::invalid_argument("Task callback must not be empty.");
+    }
+
     Task task;
 
     task.name = name;
