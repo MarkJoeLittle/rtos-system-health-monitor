@@ -242,6 +242,37 @@ Run:
 ./build-wsl/rtos_health_monitor
 ```
 
+To also save periodic telemetry snapshots as CSV:
+
+```bash
+./build-wsl/rtos_health_monitor --telemetry telemetry.csv
+```
+
+Choose a new filename; existing files are not overwritten.
+
+### Analyze Telemetry with Python
+
+With `telemetry-log-analyzer` checked out beside this repository:
+
+```bash
+mkdir -p logs
+./build-wsl/rtos_health_monitor --telemetry logs/session.csv
+python3 ../telemetry-log-analyzer/analyzer.py logs/session.csv --expected-interval 1.05
+```
+
+Snapshots contain the latest available sensor values. Timestamps preserve
+actual elapsed time using a steady clock anchored to UTC at startup.
+
+The 1.05-second analysis threshold allows 50 milliseconds of scheduling
+variation around the nominal one-second logging period. It is a
+demonstration setting, not a real-time timing guarantee.
+
+One observed 20-second run produced 19 readings, including 9 readings
+with sensor faults and one timing gap of approximately 1.70 seconds.
+Results can vary with host scheduling.
+
+Generated files under `logs/` are excluded from Git.
+
 Run all tests:
 
 ```bash
