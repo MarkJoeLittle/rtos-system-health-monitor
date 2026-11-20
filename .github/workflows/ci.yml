@@ -85,7 +85,6 @@ jobs:
       - name: Check out proposed health monitor revision
         uses: actions/checkout@v4
         with:
-          ref: 2677f6094a9baf76e5cacabe4fa692660c3c82d5
           path: rtos-system-health-monitor
           persist-credentials: false
 
