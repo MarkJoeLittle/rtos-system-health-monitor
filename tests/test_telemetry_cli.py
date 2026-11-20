@@ -54,7 +54,13 @@ class TelemetryCliTests(unittest.TestCase):
             destination = Path(directory) / "session.csv"
 
             result = self.run_application(
-                directory, "--telemetry", str(destination)
+                directory,
+                "--telemetry",
+                str(destination),
+                "--duration",
+                "1",
+                "--telemetry-interval-ms",
+                "100",
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -65,17 +71,12 @@ class TelemetryCliTests(unittest.TestCase):
                 reader = csv.DictReader(file)
                 self.assertEqual(
                     reader.fieldnames,
-                    [
-                        "timestamp",
-                        "temperature_c",
-                        "voltage_v",
-                        "comms_ok",
-                    ],
+                    ["timestamp", "temperature_c", "voltage_v", "comms_ok"],
                 )
 
                 rows = list(reader)
 
-            self.assertGreater(len(rows), 0)
+            self.assertGreater(len(rows), 1)
 
             previous = None
             for row in rows:
@@ -124,6 +125,9 @@ class TelemetryCliTests(unittest.TestCase):
                 ("--unknown",),
                 ("--telemetry",),
                 ("--telemetry", "session.csv", "extra"),
+                ("--duration", "0"),
+                ("--telemetry-interval-ms", "0"),
+                ("--telemetry-interval-ms", "100"),
             ):
                 with self.subTest(arguments=arguments):
                     result = self.run_application(directory, *arguments)

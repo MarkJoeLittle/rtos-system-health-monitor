@@ -90,6 +90,22 @@ add_test(
     COMMAND test_telemetry_logger
 )
 
+add_executable(
+    test_task_scheduler
+    tests/test_task_scheduler.cpp
+)
+
+target_link_libraries(
+    test_task_scheduler
+    PRIVATE
+    rtos_core
+)
+
+add_test(
+    NAME TaskSchedulerTests
+    COMMAND test_task_scheduler
+)
+
 find_package(Python3 COMPONENTS Interpreter)
 
 if(Python3_Interpreter_FOUND)

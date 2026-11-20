@@ -11,6 +11,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <locale>
 #include <memory>
 #include <sstream>
@@ -22,6 +23,104 @@ using namespace std::chrono_literals;
 
 namespace
 {
+struct CommandLineOptions
+{
+    bool telemetryEnabled{false};
+    std::string telemetryPath;
+    unsigned int durationSeconds{20};
+    unsigned int telemetryIntervalMilliseconds{1000};
+};
+
+bool parsePositiveUnsigned(
+    const std::string& value,
+    unsigned int& parsedValue)
+{
+    if (value.empty() ||
+        value.find_first_not_of("0123456789") != std::string::npos)
+    {
+        return false;
+    }
+
+    try
+    {
+        const unsigned long parsed = std::stoul(value);
+
+        if (parsed == 0 ||
+            parsed > std::numeric_limits<unsigned int>::max())
+        {
+            return false;
+        }
+
+        parsedValue = static_cast<unsigned int>(parsed);
+        return true;
+    }
+    catch (const std::exception&)
+    {
+        return false;
+    }
+}
+
+bool parseCommandLine(
+    int argc,
+    char* argv[],
+    CommandLineOptions& options)
+{
+    bool durationSpecified = false;
+    bool telemetryIntervalSpecified = false;
+
+    for (int index = 1; index < argc; ++index)
+    {
+        const std::string argument(argv[index]);
+
+        if (argument == "--telemetry" &&
+            !options.telemetryEnabled &&
+            index + 1 < argc)
+        {
+            options.telemetryEnabled = true;
+            options.telemetryPath = argv[++index];
+        }
+        else if (argument == "--duration" &&
+                 !durationSpecified &&
+                 index + 1 < argc)
+        {
+            durationSpecified = true;
+            if (!parsePositiveUnsigned(
+                    argv[++index],
+                    options.durationSeconds))
+            {
+                return false;
+            }
+        }
+        else if (argument == "--telemetry-interval-ms" &&
+                 !telemetryIntervalSpecified &&
+                 index + 1 < argc)
+        {
+            telemetryIntervalSpecified = true;
+            if (!parsePositiveUnsigned(
+                    argv[++index],
+                    options.telemetryIntervalMilliseconds))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    return !telemetryIntervalSpecified || options.telemetryEnabled;
+}
+
+void printUsage(const char* executable)
+{
+    std::cerr
+        << "Usage: " << executable
+        << " [--telemetry NEW_CSV_FILE]"
+        << " [--duration SECONDS]"
+        << " [--telemetry-interval-ms MILLISECONDS]\n";
+}
+
 std::string formatUtcTimestamp(
     std::chrono::system_clock::time_point timestamp)
 {
@@ -60,19 +159,17 @@ int main(int argc, char* argv[]) try
 {
     std::ofstream telemetryFile;
     std::unique_ptr<TelemetryLogger> telemetryLogger;
+    CommandLineOptions options;
 
-    if (argc != 1 &&
-        !(argc == 3 && std::string(argv[1]) == "--telemetry"))
+    if (!parseCommandLine(argc, argv, options))
     {
-        std::cerr
-            << "Usage: " << argv[0]
-            << " [--telemetry NEW_CSV_FILE]\n";
+        printUsage(argv[0]);
         return 1;
     }
 
-    if (argc == 3)
+    if (options.telemetryEnabled)
     {
-        const std::filesystem::path destination(argv[2]);
+        const std::filesystem::path destination(options.telemetryPath);
 
         if (std::filesystem::exists(destination))
         {
@@ -286,7 +383,8 @@ int main(int argc, char* argv[]) try
     {
         scheduler.addTask(
             "Telemetry Logger",
-            1000ms,
+            std::chrono::milliseconds(
+                options.telemetryIntervalMilliseconds),
             [&]()
             {
                 const auto elapsed =
@@ -303,9 +401,13 @@ int main(int argc, char* argv[]) try
             });
     }
 
-    std::cout << "Scheduler running for 20 seconds...\n\n";
+    std::cout
+        << "Scheduler running for "
+        << options.durationSeconds
+        << " seconds...\n\n";
 
-    scheduler.runFor(20000ms);
+    scheduler.runFor(
+        std::chrono::seconds(options.durationSeconds));
 
     if (telemetryLogger)
     {
@@ -317,7 +419,10 @@ int main(int argc, char* argv[]) try
                 "Cannot finish writing telemetry file.");
         }
 
-        std::cout << "Telemetry saved to: " << argv[2] << '\n';
+        std::cout
+            << "Telemetry saved to: "
+            << options.telemetryPath
+            << '\n';
     }
 
     std::cout << "\nScheduler stopped.\n";
