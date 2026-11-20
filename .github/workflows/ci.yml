@@ -76,3 +76,48 @@ jobs:
         with:
           name: telemetry-interoperability-csv
           path: rtos-system-health-monitor/logs/session.csv
+
+  proposed-pair-interoperability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Check out proposed health monitor revision
+        uses: actions/checkout@v4
+        with:
+          ref: 2677f6094a9baf76e5cacabe4fa692660c3c82d5
+          path: rtos-system-health-monitor
+          persist-credentials: false
+
+      - name: Check out proposed analyzer revision
+        uses: actions/checkout@v4
+        with:
+          repository: MarkJoeLittle/telemetry-log-analyzer
+          ref: c097b2cb25a47b15557120bc9b9023b4718cac4b
+          path: telemetry-log-analyzer
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Configure and build proposed health monitor
+        working-directory: rtos-system-health-monitor
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release --target rtos_health_monitor --parallel
+
+      - name: Test proposed producer and analyzer pair
+        working-directory: telemetry-log-analyzer
+        env:
+          RTOS_HEALTH_MONITOR_EXECUTABLE: ../rtos-system-health-monitor/build/rtos_health_monitor
+        run: python -m unittest tests/test_health_monitor_integration.py -v
+
+      - name: Record proposed pair revisions
+        run: |
+          {
+            echo "## Proposed telemetry pair"
+            echo "- Health monitor: \`$(git -C rtos-system-health-monitor rev-parse HEAD)\`"
+            echo "- Analyzer: \`$(git -C telemetry-log-analyzer rev-parse HEAD)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
