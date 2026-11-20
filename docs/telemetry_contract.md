@@ -26,12 +26,24 @@ timestamps. Each row is a periodic snapshot of the latest available values,
 not an event record. UTC is anchored once at startup; elapsed time is measured
 with a steady clock so wall-clock adjustments do not distort intervals.
 
-The analyzer requires exactly these four columns. The schema version is
-recorded in the analyzer runner's JSON manifest, not in each CSV row.
+The schema version is recorded in the analyzer runner's JSON manifest, not in
+each CSV row.
 
-Do not add, remove, reorder, or repurpose fields within contract version 1.
-Any schema change must bump the contract version and update producer,
-consumer, and compatibility tests together.
+The producer must not add, remove, reorder, or repurpose fields within
+contract version 1. Any producer schema change must bump the contract version
+and update producer and strict-consumer tests together.
+
+## Analyzer input compatibility
+
+The general-purpose analyzer remains permissive by default for backward
+compatibility. It accepts reordered columns and additional named columns,
+timestamps with UTC offsets or without timezone information, and
+case-insensitive `true`/`false` values.
+
+Pass `--strict-contract` to require producer conformance to contract version
+1: the exact header and order above, UTC timestamps with six fractional
+digits ending in `Z`, and lowercase `true` or `false`. Only strict-mode
+reports identify `contract_version` as `1`; permissive reports set it to null.
 
 ## Analysis behavior
 

@@ -280,8 +280,10 @@ python3 /path/to/telemetry-log-analyzer/scripts/run_health_monitor_demo.py \
 
 For a nonstandard executable location, use the runner's `--monitor` option as
 well. It creates a timestamped CSV and JSON report under the monitor project's
-`logs/` directory. Alternatively, invoke `analyzer.py` directly on a CSV path
-when you only need analysis.
+`logs/` directory. The capture defaults to 20 seconds and 1000 ms snapshots;
+use `--duration` and `--telemetry-interval-ms` to change those values.
+Alternatively, invoke `analyzer.py` directly on a CSV path when you only need
+analysis.
 
 Snapshots contain the latest available sensor values. Timestamps preserve
 actual elapsed time using a steady clock anchored to UTC at startup.
@@ -295,9 +297,10 @@ One observed 20-second run produced 19 readings, including 9 readings
 with sensor faults and one timing gap of approximately 1.70 seconds.
 Results can vary with host scheduling.
 
-Each successful run also creates a `*-manifest.json` file containing the
-contract version, expected interval, executable path, generated filenames,
-and host platform.
+Each successful run also creates a `*-manifest.json` file containing
+capture start, capture completion, and analysis completion times; duration;
+sampling and expected analysis intervals; executable path; repository
+revisions; generated filenames; and host platform.
 
 The JSON report includes mean, minimum, and maximum observed inter-reading
 intervals. These host measurements do not prove real-time compliance.
@@ -306,7 +309,8 @@ Generated files under `logs/` are excluded from Git.
 
 The complete producer/consumer format, including contract version 1, is
 documented in [Telemetry CSV Contract](docs/telemetry_contract.md). The
-analyzer requires the exact four-column CSV header.
+demo runner invokes strict producer-contract validation; general-purpose
+analyzer inputs remain permissive by default.
 
 Run all tests:
 
